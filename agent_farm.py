@@ -10,41 +10,41 @@ api_key = os.getenv("OPENROUTER_API_KEY")
 # List of free models to try in order. If the first model is rate-limited (429),
 # the code automatically falls back to the next one.
 # Only large models (27B–120B parameters) are included to ensure coherent output quality.
-MALLIT = [
+MODELS = [
     "meta-llama/llama-3.3-70b-instruct:free",
     "openai/gpt-oss-120b:free",
     "google/gemma-3-27b-it:free",
     "nvidia/nemotron-3-super-120b-a12b:free",
 ]
 
-def kysy(prompt):
+def ask_model(prompt):
     """Send a prompt to OpenRouter and return the model's text response.
     
-    Iterates through the MALLIT list and retries with the next model if a 429
+    Iterates through the MODELS list and retries with the next model if a 429
     rate-limit error is encountered. Raises RuntimeError if all models are exhausted.
     """
-    for malli in MALLIT:
+    for model in MODELS:
         try:
             # POST request to OpenRouter's OpenAI-compatible chat completions endpoint
-            r = httpx.post(
+            response = httpx.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
-                json={"model": malli, "messages": [{"role": "user", "content": prompt}], "max_tokens": 2048},
+                json={"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 2048},
                 timeout=30
             )
-            r.raise_for_status()
+            response.raise_for_status()
             # Extract the assistant's reply from the response JSON
-            return r.json()["choices"][0]["message"]["content"]
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429:
+            return response.json()["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code == 429:
                 # Model is overloaded — wait briefly and try the next one
-                print(f"  (malli {malli} ylikuormittunut, odotetaan 10s...)")
+                print(f"  (malli {model} ylikuormittunut, odotetaan 10s...)")
                 time.sleep(10)
                 continue
             raise
     raise RuntimeError("Kaikki mallit ylikuormittuneita, yritä myöhemmin uudelleen.")
 
-def aja_farmi():
+def run_farm():
     """Run the two-agent pipeline:
     
     Agent 1 (Researcher): Generates a short factual report on a given topic.
@@ -56,9 +56,9 @@ def aja_farmi():
     try:
         # AGENT 1: RESEARCHER — produces a short factual report
         print("🔍 Agentti 1 tutkii...")
-        prompt1 = "Olet OSINT-tutkija. Listaa 3 lyhyttä faktaa Ukrainan sodan tilanteesta tänään."
-        raportti = kysy(prompt1)
-        print(f"\n[TUTKIJA]:\n{raportti}\n")
+        researcher_prompt = "Olet OSINT-tutkija. Listaa 3 lyhyttä faktaa Ukrainan sodan tilanteesta tänään."
+        report = ask_model(researcher_prompt)
+        print(f"\n[TUTKIJA]:\n{report}\n")
 
         print("-" * 30)
         # Pause between requests to stay within free-tier rate limits
@@ -66,13 +66,13 @@ def aja_farmi():
 
         # AGENT 2: ANALYST — evaluates the researcher's report for bias and reliability
         print("⚖️ Agentti 2 analysoi...")
-        prompt2 = f"Olet kriittinen analyytikko. Arvioi tämän raportin luotettavuus ja mahdolliset vinoumat: {raportti}"
-        analyysi = kysy(prompt2)
-        print(f"\n[ANALYYTIKKO]:\n{analyysi}")
+        analyst_prompt = f"Olet kriittinen analyytikko. Arvioi tämän raportin luotettavuus ja mahdolliset vinoumat: {report}"
+        analysis = ask_model(analyst_prompt)
+        print(f"\n[ANALYYTIKKO]:\n{analysis}")
 
-    except Exception as e:
-        print(f"\n❌ VIRHE: {e}")
+    except Exception as error:
+        print(f"\n❌ VIRHE: {error}")
 
 # Entry point — only runs when executed directly, not when imported as a module
 if __name__ == "__main__":
-    aja_farmi()
+    run_farm()

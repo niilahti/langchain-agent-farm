@@ -2,19 +2,19 @@
 
 Built by **Jussi Niilahti**
 
-A simple two-agent pipeline that uses free large language models via [OpenRouter](https://openrouter.ai):
+A simple two-agent pipeline that uses free large language models via [OpenRouter](https://openrouter.ai).
 
 - **Agent 1 (Researcher):** Generates a short factual report on a given topic
-- **Agent 2 (Analyst):** Critically evaluates the report for reliability and potential bias
+- **Agent 2 (Analyst):** Critically evaluates the report for reliability and possible bias
 
-The agents communicate sequentially — the researcher's output is passed directly as input to the analyst.
+The agents run sequentially: the Researcher creates a report, and the Analyst evaluates that report.
 
 ---
 
 ## Requirements
 
 - Python 3.9+
-- An OpenRouter API key (free tier, no credit card required)
+- An OpenRouter API key
 
 ---
 
@@ -33,100 +33,150 @@ cd langchain-agent-farm
 pip3 install httpx python-dotenv
 ```
 
-| Package        | Purpose                                      |
-|----------------|----------------------------------------------|
-| `httpx`        | HTTP client for calling the OpenRouter API   |
-| `python-dotenv`| Loads the API key from the `.env` file       |
+Packages used:
+
+- `httpx` for HTTP requests to OpenRouter
+- `python-dotenv` for loading environment variables from `.env`
 
 ---
 
 ## Configuration
 
-### 1. Get an OpenRouter API key
+### 1. Create an OpenRouter account
 
-1. Go to [openrouter.ai](https://openrouter.ai) and create a free account
-2. Navigate to **Keys** → [openrouter.ai/keys](https://openrouter.ai/keys)
-3. Click **Create key**
-4. Copy the key — it starts with `sk-or-v1-`
+Go to [https://openrouter.ai](https://openrouter.ai) and sign up.
 
-> The free tier gives access to many large models (Llama 3.3 70B, GPT-OSS 120B, Gemma 3 27B etc.) without requiring payment details.
+### 2. Create an API key
 
-### 2. Create the `.env` file
+Go to [https://openrouter.ai/keys](https://openrouter.ai/keys), click **Create key**, and copy the generated key.
 
-Create a file named `.env` in the project root:
+The key usually starts with:
 
+```text
+sk-or-v1-
 ```
+
+### 3. Create a `.env` file
+
+Create a `.env` file in the project root with this structure:
+
+```env
 OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-> **Important:** Do not add quotes around the key. Do not add spaces around `=`.
+Important:
 
-The `.env` file is intentionally excluded from version control — never commit it to Git.
+- Do not use quotes
+- Do not add spaces around `=`
+- Do not commit `.env` to Git
 
 ---
 
 ## Usage
 
+Run the program with:
+
 ```bash
 python3 agent_farm.py
 ```
 
-### Example output
+If you want to save the terminal output into a text file at the same time:
 
+```bash
+python3 agent_farm.py | tee raportti.txt
 ```
+
+This prints the output to the terminal and writes the same content into `raportti.txt`.
+
+---
+
+## Example output
+
+```text
 --- 🚜 SUORA AGENTTIFARMI ---
 🔍 Agentti 1 tutkii...
 
 [TUTKIJA]:
-1. Venäjän joukot ovat jatkaneet hyökkäyksiä Harkovan alueella...
-2. Ukraina on saanut lisää ilmatorjuntaohjuksia länsimailta...
-3. YK on raportoinut kasvavista siviiliuhreista Donbassin alueella...
+1. ...
+2. ...
+3. ...
 
 ------------------------------
 ⚖️ Agentti 2 analysoi...
 
 [ANALYYTIKKO]:
-Raportin luotettavuusarviointi:
-1. Harkovan hyökkäykset — tieto on uskottava, mutta...
+...
 ```
 
 ---
 
-## How it works
+## How the code works
 
-```
-prompt1 → [Agent 1: Researcher] → report
-                                      ↓
-                         prompt2 + report → [Agent 2: Analyst] → analysis
+The main parts of the code are:
+
+- `MODELS`
+    A list of free OpenRouter models. If one model is overloaded, the code tries the next one.
+
+- `ask_model(prompt)`
+    Sends a prompt to OpenRouter and returns the response text.
+
+- `run_farm()`
+    Runs the full two-agent workflow:
+    - sends `researcher_prompt`
+    - stores the result in `report`
+    - sends `analyst_prompt`
+    - stores the result in `analysis`
+
+Workflow:
+
+```text
+researcher_prompt -> [Agent 1: Researcher] -> report
+                                                                                            |
+                                                                                            v
+analyst_prompt + report -> [Agent 2: Analyst] -> analysis
 ```
 
-The code automatically tries multiple free models in order if one is rate-limited (429). Models are tried in this order:
+The script also waits briefly between requests to reduce the chance of hitting rate limits.
+
+---
+
+## Model fallback logic
+
+The program tries these models in order:
 
 1. `meta-llama/llama-3.3-70b-instruct:free`
 2. `openai/gpt-oss-120b:free`
 3. `google/gemma-3-27b-it:free`
 4. `nvidia/nemotron-3-super-120b-a12b:free`
 
+If a model returns HTTP `429 Too Many Requests`, the script waits and automatically tries the next model.
+
 ---
 
 ## Project structure
 
-```
+```text
 langchain-agent-farm/
-├── agent_farm.py   # Main application
-├── .env            # API key (not committed to Git)
-├── .gitignore      # Should include .env
-└── README.md       # This file
+├── agent_farm.py
+├── .env
+├── README.md
+└── raportti.txt
 ```
+
+Files:
+
+- `agent_farm.py` — the main application
+- `.env` — contains your OpenRouter API key
+- `README.md` — project documentation
+- `raportti.txt` — optional output file if you use `tee`
 
 ---
 
-## .gitignore recommendation
+## Recommended .gitignore
 
-Make sure your `.gitignore` contains at least:
-
-```
+```gitignore
 .env
 __pycache__/
+raportti.txt
 ```
 
