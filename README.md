@@ -1,4 +1,4 @@
-# 🚜 Langchain Agent Farm
+# Langchain Agent Farm
 
 Built by **Jussi Niilahti**
 
