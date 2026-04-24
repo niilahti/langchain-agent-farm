@@ -1,5 +1,7 @@
 # 🚜 Langchain Agent Farm
 
+Built by **Jussi Niilahti**
+
 A simple two-agent pipeline that uses free large language models via [OpenRouter](https://openrouter.ai):
 
 - **Agent 1 (Researcher):** Generates a short factual report on a given topic
