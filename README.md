@@ -1,4 +1,4 @@
-# 🚜 Langchain Agent Farm
+# Langchain Agent Farm
 
 A simple two-agent pipeline that uses free large language models via [OpenRouter](https://openrouter.ai):
 
