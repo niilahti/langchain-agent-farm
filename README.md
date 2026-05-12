@@ -1,13 +1,24 @@
-# Langchain Agent Farm
+# LangGraph Agent Farm
 
 Built by **Jussi Niilahti**
 
-A simple two-agent pipeline that uses free large language models via [OpenRouter](https://openrouter.ai).
+A small multi-step agent workflow built with **LangGraph** and free large language models via [OpenRouter](https://openrouter.ai).
 
-- **Agent 1 (Researcher):** Generates a short factual report on a given topic
-- **Agent 2 (Analyst):** Critically evaluates the report for reliability and possible bias
+Instead of a single straight pipeline, this version keeps an explicit shared state and allows the analyst to send the researcher back for one or more revision rounds.
 
-The agents run sequentially: the Researcher creates a report, and the Analyst evaluates that report.
+---
+
+## What This Project Does
+
+The workflow has three logical stages:
+
+- **Researcher:** writes a short report about the topic
+- **Analyst:** reviews the report, scores it, and decides whether it passes or needs revision
+- **Finalizer:** writes a short final summary of the whole run
+
+If the analyst returns `REVISE`, the graph loops back to the researcher with the analyst's feedback.
+
+That is the main reason LangGraph is actually useful here: the workflow is no longer just `step 1 -> step 2`, but a small state machine with conditional routing.
 
 ---
 
@@ -30,13 +41,14 @@ cd langchain-agent-farm
 ### 2. Install dependencies
 
 ```bash
-pip3 install httpx python-dotenv
+pip3 install -r requirements.txt
 ```
 
 Packages used:
 
 - `httpx` for HTTP requests to OpenRouter
 - `python-dotenv` for loading environment variables from `.env`
+- `langgraph` for building the stateful multi-step workflow
 
 ---
 
@@ -74,69 +86,77 @@ Important:
 
 ## Usage
 
-Run the program with:
+Run the graph with the default topic:
 
 ```bash
 python3 agent_farm.py
 ```
 
-If you want to save the terminal output into a text file at the same time:
+Run the graph with your own topic:
 
 ```bash
-python3 agent_farm.py | tee raportti.txt
+python3 agent_farm.py --topic "European energy security in 2026"
 ```
 
-This prints the output to the terminal and writes the same content into `raportti.txt`.
+Limit the number of research/review rounds:
+
+```bash
+python3 agent_farm.py --topic "Arctic geopolitics" --max-iterations 2
+```
+
+If you want to save the output into a file too:
+
+```bash
+python3 agent_farm.py --topic "AI chip competition" | tee raportti.txt
+```
 
 ---
 
-## Example output
+## Example Flow
 
 ```text
---- 🚜 SUORA AGENTTIFARMI ---
-🔍 Agentti 1 tutkii...
-
-[TUTKIJA]:
-1. ...
-2. ...
-3. ...
-
-------------------------------
-⚖️ Agentti 2 analysoi...
-
-[ANALYYTIKKO]:
-...
+START
+    -> Researcher
+    -> Analyst
+            -> PASS   -> Finalizer -> END
+            -> REVISE -> Researcher -> ...
 ```
 
 ---
 
 ## How the code works
 
-The main parts of the code are:
+The main ideas are:
 
-- `MODELS`
-    A list of free OpenRouter models. If one model is overloaded, the code tries the next one.
+- `FarmState`
+    Shared state that moves through the graph. It contains the topic, current report, latest analysis, verdict, score, histories, and final summary.
 
-- `ask_model(prompt)`
-    Sends a prompt to OpenRouter and returns the response text.
+- `researcher_node(state)`
+    Creates the first report or revises the current one using analyst feedback.
 
-- `run_farm()`
-    Runs the full two-agent workflow:
-    - sends `researcher_prompt`
-    - stores the result in `report`
-    - sends `analyst_prompt`
-    - stores the result in `analysis`
+- `analyst_node(state)`
+    Reviews the latest report and returns a verdict:
+    - `PASS`
+    - `REVISE`
 
-Workflow:
+- `route_after_analysis(state)`
+    The routing function that decides whether the graph loops back for another revision or moves to finalization.
 
-```text
-researcher_prompt -> [Agent 1: Researcher] -> report
-                                                                                            |
-                                                                                            v
-analyst_prompt + report -> [Agent 2: Analyst] -> analysis
-```
+- `finalize_node(state)`
+    Produces a short end summary once the workflow is finished.
 
-The script also waits briefly between requests to reduce the chance of hitting rate limits.
+---
+
+## Why LangGraph Helps Here
+
+LangGraph is useful in this version because the workflow now has:
+
+- a shared explicit state
+- conditional branching
+- iterative revision rounds
+- a clear graph structure instead of one long procedural function
+
+If this were still only one research call and one analysis call, plain Python would be enough.
 
 ---
 
@@ -158,6 +178,7 @@ If a model returns HTTP `429 Too Many Requests`, the script waits and automatica
 ```text
 langchain-agent-farm/
 ├── agent_farm.py
+├── requirements.txt
 ├── .env
 ├── README.md
 └── raportti.txt
@@ -165,10 +186,11 @@ langchain-agent-farm/
 
 Files:
 
-- `agent_farm.py` — the main application
-- `.env` — contains your OpenRouter API key
-- `README.md` — project documentation
-- `raportti.txt` — optional output file if you use `tee`
+- `agent_farm.py` - main LangGraph workflow
+- `requirements.txt` - Python dependencies
+- `.env` - contains your OpenRouter API key
+- `README.md` - project documentation
+- `raportti.txt` - optional saved output if you use `tee`
 
 ---
 
