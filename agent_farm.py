@@ -123,9 +123,11 @@ def parse_analyst_response(text: str) -> Dict[str, Any]:
     Free models are not perfectly reliable, so the parser falls back to safe
     defaults if the response format is imperfect.
     """
-    verdict_match = re.search(r"VERDICT:\s*(PASS|REVISE)", text)
-    score_match = re.search(r"SCORE:\s*(\d+)", text)
-    feedback_match = re.search(r"FEEDBACK:\s*(.*)", text, re.DOTALL)
+    normalized_text = text.replace("**", "")
+
+    verdict_match = re.search(r"VERDICT:\s*(PASS|REVISE)", normalized_text)
+    score_match = re.search(r"SCORE:\s*(\d+)", normalized_text)
+    feedback_match = re.search(r"FEEDBACK:\s*(.*)", normalized_text, re.DOTALL)
 
     verdict: Literal["PASS", "REVISE"] = "REVISE"
     if verdict_match:
